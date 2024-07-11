@@ -220,7 +220,7 @@ namespace vk
       SwapChainData( vk::PhysicalDevice const & physicalDevice,
                      vk::Device const &         device,
                      vk::SurfaceKHR const &     surface,
-                     vk::Extent2D const &       extent,
+                     vk::Extent2D &             extent,
                      vk::ImageUsageFlags        usage,
                      vk::SwapchainKHR const &   oldSwapChain,
                      uint32_t                   graphicsFamilyIndex,

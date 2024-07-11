@@ -331,7 +331,7 @@ namespace vk
         SwapChainData( vk::raii::PhysicalDevice const & physicalDevice,
                        vk::raii::Device const &         device,
                        vk::raii::SurfaceKHR const &     surface,
-                       vk::Extent2D const &             extent,
+                       vk::Extent2D &                   extent,
                        vk::ImageUsageFlags              usage,
                        vk::raii::SwapchainKHR const *   pOldSwapchain,
                        uint32_t                         graphicsQueueFamilyIndex,
@@ -353,6 +353,8 @@ namespace vk
             // If the surface size is defined, the swap chain size must match
             swapchainExtent = surfaceCapabilities.currentExtent;
           }
+
+          extent = swapchainExtent;
           vk::SurfaceTransformFlagBitsKHR preTransform = ( surfaceCapabilities.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity )
                                                          ? vk::SurfaceTransformFlagBitsKHR::eIdentity
                                                          : surfaceCapabilities.currentTransform;
@@ -749,7 +751,7 @@ namespace vk
 #else
         vk::StructureChain<vk::InstanceCreateInfo, vk::DebugUtilsMessengerCreateInfoEXT>
 #endif
-          instanceCreateInfoChain = vk::su::makeInstanceCreateInfoChain( {}, applicationInfo, enabledLayers, enabledExtensions );
+          instanceCreateInfoChain = vk::su::makeInstanceCreateInfoChain( InstanceCreateFlagBits::eEnumeratePortabilityKHR, applicationInfo, enabledLayers, enabledExtensions );
 
         return vk::raii::Instance( context, instanceCreateInfoChain.get<vk::InstanceCreateInfo>() );
       }

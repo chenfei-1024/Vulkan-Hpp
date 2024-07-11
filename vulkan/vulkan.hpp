@@ -12,6 +12,7 @@
 #include <array>     // ArrayWrapperND
 #include <string.h>  // strnlen
 #include <string>    // std::string
+#define VK_ENABLE_BETA_EXTENSIONS
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_hpp_macros.hpp>
 

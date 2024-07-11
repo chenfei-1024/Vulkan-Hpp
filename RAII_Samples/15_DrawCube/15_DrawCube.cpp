@@ -55,7 +55,7 @@ int main( int /*argc*/, char ** /*argv*/ )
       vk::raii::su::findGraphicsAndPresentQueueFamilyIndex( physicalDevice, surfaceData.surface );
     vk::raii::Device device = vk::raii::su::makeDevice( physicalDevice, graphicsAndPresentQueueFamilyIndex.first, vk::su::getDeviceExtensions() );
 
-    vk::raii::CommandPool   commandPool   = vk::raii::CommandPool( device, { {}, graphicsAndPresentQueueFamilyIndex.first } );
+    vk::raii::CommandPool   commandPool   = vk::raii::CommandPool( device, { vk::CommandPoolCreateFlagBits::eResetCommandBuffer, graphicsAndPresentQueueFamilyIndex.first } );
     vk::raii::CommandBuffer commandBuffer = vk::raii::su::makeCommandBuffer( device, commandPool );
 
     vk::raii::Queue graphicsQueue( device, graphicsAndPresentQueueFamilyIndex.first, 0 );
@@ -118,50 +118,57 @@ int main( int /*argc*/, char ** /*argv*/ )
 
     // Get the index of the next available swapchain image:
     vk::raii::Semaphore imageAcquiredSemaphore( device, vk::SemaphoreCreateInfo() );
-
-    vk::Result result;
-    uint32_t   imageIndex;
-    std::tie( result, imageIndex ) = swapChainData.swapChain.acquireNextImage( vk::su::FenceTimeout, imageAcquiredSemaphore );
-    assert( result == vk::Result::eSuccess );
-    assert( imageIndex < swapChainData.images.size() );
-
-    commandBuffer.begin( {} );
-
-    std::array<vk::ClearValue, 2> clearValues;
-    clearValues[0].color        = vk::ClearColorValue( 0.2f, 0.2f, 0.2f, 0.2f );
-    clearValues[1].depthStencil = vk::ClearDepthStencilValue( 1.0f, 0 );
-    vk::RenderPassBeginInfo renderPassBeginInfo( renderPass, framebuffers[imageIndex], vk::Rect2D( vk::Offset2D( 0, 0 ), surfaceData.extent ), clearValues );
-    commandBuffer.beginRenderPass( renderPassBeginInfo, vk::SubpassContents::eInline );
-    commandBuffer.bindPipeline( vk::PipelineBindPoint::eGraphics, graphicsPipeline );
-    commandBuffer.bindDescriptorSets( vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, { descriptorSet }, nullptr );
-
-    commandBuffer.bindVertexBuffers( 0, { vertexBufferData.buffer }, { 0 } );
-    commandBuffer.setViewport(
-      0, vk::Viewport( 0.0f, 0.0f, static_cast<float>( surfaceData.extent.width ), static_cast<float>( surfaceData.extent.height ), 0.0f, 1.0f ) );
-    commandBuffer.setScissor( 0, vk::Rect2D( vk::Offset2D( 0, 0 ), surfaceData.extent ) );
-
-    commandBuffer.draw( 12 * 3, 1, 0, 0 );
-    commandBuffer.endRenderPass();
-    commandBuffer.end();
-
     vk::raii::Fence drawFence( device, vk::FenceCreateInfo() );
 
-    vk::PipelineStageFlags waitDestinationStageMask( vk::PipelineStageFlagBits::eColorAttachmentOutput );
-    vk::SubmitInfo         submitInfo( *imageAcquiredSemaphore, waitDestinationStageMask, *commandBuffer );
-    graphicsQueue.submit( submitInfo, *drawFence );
-
-    while ( vk::Result::eTimeout == device.waitForFences( { drawFence }, VK_TRUE, vk::su::FenceTimeout ) )
-      ;
-
-    vk::PresentInfoKHR presentInfoKHR( nullptr, *swapChainData.swapChain, imageIndex );
-    result = presentQueue.presentKHR( presentInfoKHR );
-    switch ( result )
+    while(!glfwWindowShouldClose( surfaceData.window.handle))
     {
-      case vk::Result::eSuccess: break;
-      case vk::Result::eSuboptimalKHR: std::cout << "vk::Queue::presentKHR returned vk::Result::eSuboptimalKHR !\n"; break;
-      default: assert( false );  // an unexpected result is returned !
+        glfwPollEvents();
+        vk::Result result;
+        uint32_t   imageIndex;
+        std::tie( result, imageIndex ) = swapChainData.swapChain.acquireNextImage( vk::su::FenceTimeout, imageAcquiredSemaphore );
+        assert( result == vk::Result::eSuccess );
+        assert( imageIndex < swapChainData.images.size() );
+
+        commandBuffer.begin( {} );
+
+        std::array<vk::ClearValue, 2> clearValues;
+        static float clearColorG = 0.2f;
+        clearColorG += 0.01f;
+        clearValues[0].color        = vk::ClearColorValue( 0.2f, clearColorG, 0.2f, 0.2f );
+        clearValues[1].depthStencil = vk::ClearDepthStencilValue( 1.0f, 0 );
+        vk::RenderPassBeginInfo renderPassBeginInfo( renderPass, framebuffers[imageIndex], vk::Rect2D( vk::Offset2D( 0, 0 ), surfaceData.extent ), clearValues );
+        commandBuffer.beginRenderPass( renderPassBeginInfo, vk::SubpassContents::eInline );
+        commandBuffer.bindPipeline( vk::PipelineBindPoint::eGraphics, graphicsPipeline );
+        commandBuffer.bindDescriptorSets( vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, { descriptorSet }, nullptr );
+
+        commandBuffer.bindVertexBuffers( 0, { vertexBufferData.buffer }, { 0 } );
+        commandBuffer.setViewport(
+          0, vk::Viewport( 0.0f, 0.0f, static_cast<float>( surfaceData.extent.width ), static_cast<float>( surfaceData.extent.height ), 0.0f, 1.0f ) );
+        commandBuffer.setScissor( 0, vk::Rect2D( vk::Offset2D( 0, 0 ), surfaceData.extent ) );
+
+        commandBuffer.draw( 12 * 3, 1, 0, 0 );
+        commandBuffer.endRenderPass();
+        commandBuffer.end();
+
+        vk::PipelineStageFlags waitDestinationStageMask( vk::PipelineStageFlagBits::eColorAttachmentOutput );
+        vk::SubmitInfo         submitInfo( *imageAcquiredSemaphore, waitDestinationStageMask, *commandBuffer );
+        device.resetFences({drawFence});
+        graphicsQueue.submit( submitInfo, *drawFence );
+
+        while ( vk::Result::eTimeout == device.waitForFences( { drawFence }, VK_TRUE, vk::su::FenceTimeout ) )
+          ;
+
+        vk::PresentInfoKHR presentInfoKHR( nullptr, *swapChainData.swapChain, imageIndex );
+        result = presentQueue.presentKHR( presentInfoKHR );
+        switch ( result )
+        {
+          case vk::Result::eSuccess: break;
+          case vk::Result::eSuboptimalKHR: std::cout << "vk::Queue::presentKHR returned vk::Result::eSuboptimalKHR !\n"; break;
+          default: assert( false );  // an unexpected result is returned !
+        }
+        std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
     }
-    std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
+
 
     /* VULKAN_KEY_END */
 

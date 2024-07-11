@@ -301,7 +301,7 @@ namespace vk
       );
 
       vk::Instance instance =
-        vk::createInstance( makeInstanceCreateInfoChain( {}, applicationInfo, enabledLayers, enabledExtensions ).get<vk::InstanceCreateInfo>() );
+        vk::createInstance( makeInstanceCreateInfoChain( vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR, applicationInfo, enabledLayers, enabledExtensions ).get<vk::InstanceCreateInfo>() );
 
 #if ( VULKAN_HPP_DISPATCH_LOADER_DYNAMIC == 1 )
       // initialize function pointers for instance
@@ -473,7 +473,7 @@ namespace vk
 
     std::vector<std::string> getDeviceExtensions()
     {
-      return { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+      return { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME };
     }
 
     std::vector<std::string> getInstanceExtensions()
@@ -484,6 +484,8 @@ namespace vk
       extensions.push_back( VK_KHR_ANDROID_SURFACE_EXTENSION_NAME );
 #elif defined( VK_USE_PLATFORM_METAL_EXT )
       extensions.push_back( VK_EXT_METAL_SURFACE_EXTENSION_NAME );
+      extensions.push_back( VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME );
+      extensions.push_back( VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME );
 #elif defined( VK_USE_PLATFORM_VI_NN )
       extensions.push_back( VK_NN_VI_SURFACE_EXTENSION_NAME );
 #elif defined( VK_USE_PLATFORM_WAYLAND_KHR )
@@ -791,7 +793,7 @@ namespace vk
     SwapChainData::SwapChainData( vk::PhysicalDevice const & physicalDevice,
                                   vk::Device const &         device,
                                   vk::SurfaceKHR const &     surface,
-                                  vk::Extent2D const &       extent,
+                                  vk::Extent2D &             extent,
                                   vk::ImageUsageFlags        usage,
                                   vk::SwapchainKHR const &   oldSwapChain,
                                   uint32_t                   graphicsQueueFamilyIndex,
@@ -813,6 +815,8 @@ namespace vk
         // If the surface size is defined, the swap chain size must match
         swapchainExtent = surfaceCapabilities.currentExtent;
       }
+
+      extent = swapchainExtent;
       vk::SurfaceTransformFlagBitsKHR preTransform = ( surfaceCapabilities.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity )
                                                      ? vk::SurfaceTransformFlagBitsKHR::eIdentity
                                                      : surfaceCapabilities.currentTransform;

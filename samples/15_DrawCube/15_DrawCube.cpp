@@ -44,7 +44,7 @@ int main( int /*argc*/, char ** /*argv*/ )
     std::pair<uint32_t, uint32_t> graphicsAndPresentQueueFamilyIndex = vk::su::findGraphicsAndPresentQueueFamilyIndex( physicalDevice, surfaceData.surface );
     vk::Device                    device = vk::su::createDevice( physicalDevice, graphicsAndPresentQueueFamilyIndex.first, vk::su::getDeviceExtensions() );
 
-    vk::CommandPool   commandPool = device.createCommandPool( { {}, graphicsAndPresentQueueFamilyIndex.first } );
+    vk::CommandPool   commandPool = device.createCommandPool( { vk::CommandPoolCreateFlagBits::eResetCommandBuffer , graphicsAndPresentQueueFamilyIndex.first } );
     vk::CommandBuffer commandBuffer =
       device.allocateCommandBuffers( vk::CommandBufferAllocateInfo( commandPool, vk::CommandBufferLevel::ePrimary, 1 ) ).front();
 
@@ -79,7 +79,7 @@ int main( int /*argc*/, char ** /*argv*/ )
     glslang::FinalizeProcess();
 
     std::vector<vk::Framebuffer> framebuffers =
-      vk::su::createFramebuffers( device, renderPass, swapChainData.imageViews, depthBufferData.imageView, surfaceData.extent );
+      vk::su::createFramebuffers( device, renderPass, swapChainData.imageViews, depthBufferData.imageView, surfaceData.extent);
 
     vk::su::BufferData vertexBufferData( physicalDevice, device, sizeof( coloredCubeData ), vk::BufferUsageFlagBits::eVertexBuffer );
     vk::su::copyToDevice( device, vertexBufferData.deviceMemory, coloredCubeData, sizeof( coloredCubeData ) / sizeof( coloredCubeData[0] ) );
@@ -106,50 +106,60 @@ int main( int /*argc*/, char ** /*argv*/ )
 
     // Get the index of the next available swapchain image:
     vk::Semaphore             imageAcquiredSemaphore = device.createSemaphore( vk::SemaphoreCreateInfo() );
-    vk::ResultValue<uint32_t> currentBuffer = device.acquireNextImageKHR( swapChainData.swapChain, vk::su::FenceTimeout, imageAcquiredSemaphore, nullptr );
-    assert( currentBuffer.result == vk::Result::eSuccess );
-    assert( currentBuffer.value < framebuffers.size() );
-
-    commandBuffer.begin( vk::CommandBufferBeginInfo( vk::CommandBufferUsageFlags() ) );
-
-    std::array<vk::ClearValue, 2> clearValues;
-    clearValues[0].color        = vk::ClearColorValue( 0.2f, 0.2f, 0.2f, 0.2f );
-    clearValues[1].depthStencil = vk::ClearDepthStencilValue( 1.0f, 0 );
-    vk::RenderPassBeginInfo renderPassBeginInfo(
-      renderPass, framebuffers[currentBuffer.value], vk::Rect2D( vk::Offset2D( 0, 0 ), surfaceData.extent ), clearValues );
-    commandBuffer.beginRenderPass( renderPassBeginInfo, vk::SubpassContents::eInline );
-    commandBuffer.bindPipeline( vk::PipelineBindPoint::eGraphics, graphicsPipeline );
-    commandBuffer.bindDescriptorSets( vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, descriptorSet, nullptr );
-
-    commandBuffer.bindVertexBuffers( 0, vertexBufferData.buffer, { 0 } );
-    commandBuffer.setViewport(
-      0, vk::Viewport( 0.0f, 0.0f, static_cast<float>( surfaceData.extent.width ), static_cast<float>( surfaceData.extent.height ), 0.0f, 1.0f ) );
-    commandBuffer.setScissor( 0, vk::Rect2D( vk::Offset2D( 0, 0 ), surfaceData.extent ) );
-
-    commandBuffer.draw( 12 * 3, 1, 0, 0 );
-    commandBuffer.endRenderPass();
-    commandBuffer.end();
-
     vk::Fence drawFence = device.createFence( vk::FenceCreateInfo() );
 
-    vk::PipelineStageFlags waitDestinationStageMask( vk::PipelineStageFlagBits::eColorAttachmentOutput );
-    vk::SubmitInfo         submitInfo( imageAcquiredSemaphore, waitDestinationStageMask, commandBuffer );
-    graphicsQueue.submit( submitInfo, drawFence );
 
-    while ( vk::Result::eTimeout == device.waitForFences( drawFence, VK_TRUE, vk::su::FenceTimeout ) )
-      ;
-
-    vk::Result result = presentQueue.presentKHR( vk::PresentInfoKHR( {}, swapChainData.swapChain, currentBuffer.value ) );
-    switch ( result )
+    while(!glfwWindowShouldClose(surfaceData.window.handle))
     {
-      case vk::Result::eSuccess: break;
-      case vk::Result::eSuboptimalKHR: std::cout << "vk::Queue::presentKHR returned vk::Result::eSuboptimalKHR !\n"; break;
-      default: assert( false );  // an unexpected result is returned !
+        glfwPollEvents();
+        vk::ResultValue<uint32_t> currentBuffer = device.acquireNextImageKHR( swapChainData.swapChain, vk::su::FenceTimeout, imageAcquiredSemaphore, nullptr );
+        assert( currentBuffer.result == vk::Result::eSuccess );
+        assert( currentBuffer.value < framebuffers.size() );
+
+        // commandBuffer.reset();
+        commandBuffer.begin( vk::CommandBufferBeginInfo( vk::CommandBufferUsageFlagBits::eOneTimeSubmit ) );
+
+        std::array<vk::ClearValue, 2> clearValues;
+        static float clearColorDeltaR = 0.2;
+        clearColorDeltaR += 0.01;
+        clearValues[0].color        = vk::ClearColorValue( clearColorDeltaR, 0.2f, 0.2f, 0.2f );
+        clearValues[1].depthStencil = vk::ClearDepthStencilValue( 1.0f, 0 );
+        vk::RenderPassBeginInfo renderPassBeginInfo(
+          renderPass, framebuffers[currentBuffer.value], vk::Rect2D( vk::Offset2D( 0, 0 ), surfaceData.extent ), clearValues );
+        commandBuffer.beginRenderPass( renderPassBeginInfo, vk::SubpassContents::eInline );
+        commandBuffer.bindPipeline( vk::PipelineBindPoint::eGraphics, graphicsPipeline );
+        commandBuffer.bindDescriptorSets( vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, descriptorSet, nullptr );
+
+        commandBuffer.bindVertexBuffers( 0, vertexBufferData.buffer, { 0 } );
+        commandBuffer.setViewport(
+          0, vk::Viewport( 0.0f, 0.0f, static_cast<float>( surfaceData.extent.width ), static_cast<float>( surfaceData.extent.height ), 0.0f, 1.0f ) );
+        commandBuffer.setScissor( 0, vk::Rect2D( vk::Offset2D( 0, 0 ), surfaceData.extent ) );
+
+        commandBuffer.draw( 12 * 3, 1, 0, 0 );
+        commandBuffer.endRenderPass();
+        commandBuffer.end();
+
+
+        vk::PipelineStageFlags waitDestinationStageMask( vk::PipelineStageFlagBits::eColorAttachmentOutput );
+        vk::SubmitInfo         submitInfo( imageAcquiredSemaphore, waitDestinationStageMask, commandBuffer );
+        device.resetFences(drawFence);
+        graphicsQueue.submit( submitInfo, drawFence );
+
+        while ( vk::Result::eTimeout == device.waitForFences( drawFence, VK_TRUE, vk::su::FenceTimeout ) )
+          ;
+
+        vk::Result result = presentQueue.presentKHR( vk::PresentInfoKHR( {}, swapChainData.swapChain, currentBuffer.value ) );
+        switch ( result )
+        {
+          case vk::Result::eSuccess: break;
+          case vk::Result::eSuboptimalKHR: std::cout << "vk::Queue::presentKHR returned vk::Result::eSuboptimalKHR !\n"; break;
+          default: assert( false );  // an unexpected result is returned !
+        }
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+
     }
-    std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
 
     device.waitIdle();
-
     device.destroyFence( drawFence );
     device.destroySemaphore( imageAcquiredSemaphore );
 

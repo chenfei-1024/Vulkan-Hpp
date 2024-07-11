@@ -29,15 +29,15 @@ if ( NOT CMAKE_CXX_STANDARD )
 endif()
 
 # all the options for this project
-option( VULKAN_HPP_PRECOMPILE "Precompile vulkan.hpp and vulkan_raii.hpp for sample builds" ON )
+option( VULKAN_HPP_PRECOMPILE "Precompile vulkan.hpp and vulkan_raii.hpp for sample builds" OFF )
 option( VULKAN_HPP_RUN_GENERATOR "Run the HPP generator" OFF )
-option( VULKAN_HPP_SAMPLES_BUILD "Build samples" OFF )
+option( VULKAN_HPP_SAMPLES_BUILD "Build samples" ON )
 option( VULKAN_HPP_TESTS_BUILD "Build tests" OFF )
 option( VULKAN_HPP_SAMPLES_BUILD_ONLY_DYNAMIC "Build only dynamic. Required in case the Vulkan SDK is not available" OFF )
 option( VULKAN_HPP_TESTS_BUILD_ONLY_DYNAMIC "Build only dynamic" OFF )
 option( VULKAN_HPP_BUILD_WITH_LOCAL_VULKAN_HPP "Build with local Vulkan headers" ON )
 option( VULKAN_HPP_ENABLE_CPP20_MODULES "Build Vulkan-Hpp as C++20 module; requires minimum CMake version 3.28" OFF )
-option( VULKAN_HPP_CPP20_MODULE_DYNAMIC_DISPATCHER "Build C++20 module with dynamic Dispatcher" ON )
+option( VULKAN_HPP_CPP20_MODULE_DYNAMIC_DISPATCHER "Build C++20 module with dynamic Dispatcher" OFF )
 
 if ( VULKAN_HPP_ENABLE_CPP20_MODULES )
 	cmake_minimum_required( VERSION 3.28 )
